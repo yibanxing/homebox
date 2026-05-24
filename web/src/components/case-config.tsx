@@ -47,20 +47,10 @@ interface FormObjectGroup<T extends FormFields> extends FormFieldBase<FormFields
   fields: T
 }
 
-interface FormArrayGroup<T> extends FormFieldBase<T> {
-  type: 'array'
-  fields: FormField<T>[]
-}
-
 type FormFields = Record<string | number, FormFieldBase<any>>
 
 type FormFieldsValue<F extends FormFields> = {
   [K in keyof F]: F[K] extends FormFieldBase<infer T> ? T : never
-}
-
-interface Form<F extends FormFields> {
-  fields: F
-  values: FormFieldsValue<F>
 }
 
 interface FormFieldConfig<T> {
@@ -74,30 +64,6 @@ function getValuesFromFields<T extends FormFields = FormFields>(fields: T): Form
     values[key as any] = field.value
     return values
   }, {} as FormFieldsValue<T>)
-}
-
-function createForm<F extends FormFields>(fields: F): Form<F> {
-  let cacheValues = getValuesFromFields(fields)
-  let dirtyValues = false
-
-  const fieldsArray = Object.values(fields)
-
-  for (const field of fieldsArray) {
-    field.whenChanged(() => {
-      dirtyValues = true
-    })
-  }
-
-  return {
-    fields,
-    get values() {
-      if (dirtyValues) {
-        cacheValues = getValuesFromFields(fields)
-        dirtyValues = false
-      }
-      return cacheValues as FormFieldsValue<F>
-    },
-  }
 }
 
 function createFormField<T>(initial: T, config: FormFieldConfig<T> = {}): FormField<T> {
@@ -166,7 +132,7 @@ function createFormField<T>(initial: T, config: FormFieldConfig<T> = {}): FormFi
   }
 }
 
-function createFormObjectGroup<T extends FormFields>(fields: T, config: FormFieldConfig<T> = {}): FormObjectGroup<T> {
+function createFormObjectGroup<T extends FormFields>(fields: T): FormObjectGroup<T> {
   type V = FormFieldsValue<T>
   const initial = getValuesFromFields<T>(fields)
   let cacheValues = initial
@@ -242,11 +208,11 @@ function createFormObjectGroup<T extends FormFields>(fields: T, config: FormFiel
 }
 
 export function CaseConfig(props: { defaultValue?: Config; onChange?: (v: Config) => void }) {
-  const [_, setCount] = useState(0)
-  const onChangeRef = useRef(props.onChange)
-  onChangeRef.current = props.onChange
+  const { defaultValue, onChange } = props
+  const [, setCount] = useState(0)
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
   const form = useMemo(() => {
-    const { defaultValue } = props
     const group = createFormObjectGroup({
       runningMode: createFormField(defaultValue?.duration !== Infinity ? RunningMode.ONCE : RunningMode.CONTINUE, {}),
       threadCount: createFormField(defaultValue?.threadCount ?? 1, {}),
@@ -287,7 +253,7 @@ export function CaseConfig(props: { defaultValue?: Config; onChange?: (v: Config
       }
     })
     return group
-  }, [])
+  }, [defaultValue])
   const [isAdvancedConfig, setAdvancedConfig] = useState(false)
 
   const { runningMode, threadCount, speedRange, packCount, duration, unit, parallel, theme } = form.fields
@@ -295,7 +261,11 @@ export function CaseConfig(props: { defaultValue?: Config; onChange?: (v: Config
     <div>
       <$Header>
         <$HeaderLeft>
-          <ButtonGroup css={css`${$mgr8}${$valm}`}>
+          <ButtonGroup
+            css={css`
+              ${$mgr8}${$valm}
+            `}
+          >
             <Button
               intent={runningMode.value === RunningMode.ONCE ? 'success' : 'none'}
               onClick={() => runningMode.onChange(RunningMode.ONCE)}
@@ -311,7 +281,11 @@ export function CaseConfig(props: { defaultValue?: Config; onChange?: (v: Config
               持续压测
             </Button>
           </ButtonGroup>
-          <ButtonGroup css={css`${$mgr8}${$valm}`}>
+          <ButtonGroup
+            css={css`
+              ${$mgr8}${$valm}
+            `}
+          >
             <Button
               title='Byte per second'
               intent={unit.value === RateUnit.BYTE ? 'success' : 'none'}
@@ -358,20 +332,20 @@ export function CaseConfig(props: { defaultValue?: Config; onChange?: (v: Config
           `}
         >
           {runningMode.value === RunningMode.ONCE && (
-            <FormGroup label='测速持续时间' labelInfo='(s)' key='duration' inline={true}>
+            <FormGroup label='测速持续时间' labelInfo='(s)' key='duration' inline>
               <NumericInput value={duration.value} onValueChange={duration.onChange} />
             </FormGroup>
           )}
           <FormGroup
             label='测速速度范围'
             key='speedRange'
-            inline={true}
+            inline
             helperText='低速模式下不会压榨系统资源；高速模式下会尽力压榨系统资源'
           >
             <RadioGroup
               selectedValue={speedRange.value}
               onChange={(e) => speedRange.onChange(e.currentTarget.value as SpeedMode)}
-              inline={true}
+              inline
             >
               <Radio label='低速 (通常网络小于 2.5G)' value={SpeedMode.LOW} />
               <Radio label='高速 (通常网络大于 2.5G)' value={SpeedMode.HIGH} />
